@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Widget de Flashcards</title>
+<style>
+  body {
+    margin: 0;
+    padding: 16px;
+    min-height: 100vh;
+    background: #f3f4f6;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  .fc-widget, .fc-widget * { box-sizing: border-box; }
+  .fc-widget [hidden] { display: none !important; }
+
+  .fc-widget {
+    --fc-primary: #6366f1;
+    --fc-border: #e5e7eb;
+    --fc-text: #111827;
+    --fc-muted: #6b7280;
+    --fc-soft: #f9fafb;
+
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 22px;
+    background: #fff;
+    border: 1px solid var(--fc-border);
+    border-radius: 18px;
+    box-shadow: 0 12px 32px rgba(17, 24, 39, .08);
+    color: var(--fc-text);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  /* ---------- Cabeçalho ---------- */
+  .fc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .fc-title { margin: 0; font-size: 18px; font-weight: 700; }
+
+  .fc-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--fc-soft);
+    border-radius: 10px;
+  }
+  .fc-tab {
+    border: 0;
+    background: transparent;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--fc-muted);
+    cursor: pointer;
+    transition: .15s;
+  }
+  .fc-tab:hover { color: var(--fc-text); }
+  .fc-tab.is-active {
+    background: #fff;
+    color: var(--fc-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .1);
+  }
+
+  /* ---------- Barra de ferramentas ---------- */
+  .fc-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .fc-select {
+    font: inherit;
+    font-size: 14px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    border: 1px solid var(--fc-border);
+    background: #fff;
+    color: var(--fc-text);
+    cursor: pointer;
+  }
+  .fc-counter {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fc-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Card 3D ---------- */
+  .fc-scene {
+    perspective: 1400px;
+    height: 250px;
+  }
+  .fc-card {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform .55s cubic-bezier(.4, .2, .2, 1);
+    cursor: pointer;
+  }
+  .fc-card.is-flipped { transform: rotateY(180deg); }
+
+  .fc-face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 22px;
+    border-radius: 16px;
+    border: 1px solid var(--fc-border);
+    box-shadow: 0 4px 14px rgba(17, 24, 39, .06);
+    text-align: center;
+    overflow: auto;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .fc-front { background: linear-gradient(160deg, #ffffff, #f8fafc); }
+  .fc-back {
+    background: linear-gradient(160deg, #eef2ff, #e0e7ff);
+    transform: rotateY(180deg);
+  }
+
+  .fc-face-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--fc-muted);
+  }
+  .fc-face-text {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .fc-back .fc-face-text { font-size: 17px; font-weight: 500; }
+
+  .fc-hint {
+    margin: 10px 0 0;
+    text-align: center;
+    font-size: 12px;
+    color: var(--fc-muted);
+  }
+
+  /* ---------- Navegação ---------- */
+  .fc-nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .fc-btn {
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 9px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--fc-border);
+    background: #fff;
+    color: var(--fc-text);
+    cursor: pointer;
+    transition: .15s;
+  }
+  .fc-btn:hover { background: var(--fc-soft); border-color: #d1d5db; }
+  .fc-btn:active { transform: translateY(1px); }
+
+  /* ---------- Botões de avaliação ---------- */
+  .fc-rate {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .fc-rate button {
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 11px 8px;
+    border-radius: 10px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: .15s;
+  }
+  .fc-rate button:active { transform: translateY(1px); }
+  .fc-rate [data-level="dificil"] { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+  .fc-rate [data-level="dificil"]:hover { background: #fee2e2; }
+  .fc-rate [data-level="medio"]   { background: #fffbeb; border-color: #fde68a; color: #b45309; }
+  .fc-rate [data-level="medio"]:hover { background: #fef3c7; }
+  .fc-rate [data-level="facil"]   { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+  .fc-rate [data-level="facil"]:hover { background: #d1fae5; }
+
+  /* ---------- Estado vazio ---------- */
+  .fc-empty {
+    padding: 40px 16px;
+    text-align: center;
+    font-size: 14px;
+    color: var(--fc-muted);
+    border: 1px dashed var(--fc-border);
+    border-radius: 12px;
+    background: var(--fc-soft);
+  }
+  .fc-empty p { margin: 0; }
+
+  /* ---------- Gerenciar ---------- */
+  .fc-add {
+    width: 100%;
+    margin-bottom: 14px;
+    padding: 11px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: 10px;
+    border: 1px dashed #c7d2fe;
+    background: #eef2ff;
+    color: #4338ca;
+    cursor: pointer;
+    transition: .15s;
+  }
+  .fc-add:hover { background: #e0e7ff; }
+
+  .fc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .fc-list:empty { display: none; }
+
+  .fc-item {
+    border: 1px solid var(--fc-border);
+    border-radius: 12px;
+    padding: 12px;
+    background: var(--fc-soft);
+  }
+  .fc-item-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .fc-item-num {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #e5e7eb;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--fc-muted);
+  }
+  .fc-badge {
+    margin-right: auto;
+    padding: 3px 9px;
+    border-radius: 99px;
+    border: 1px solid transparent;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .fc-badge.is-none    { background: #f3f4f6; color: var(--fc-muted); border-color: #e5e7eb; }
+  .fc-badge.is-facil   { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+  .fc-badge.is-medio   { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+  .fc-badge.is-dificil { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+
+  .fc-icon-btn {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--fc-border);
+    border-radius: 8px;
+    background: #fff;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: .15s;
+  }
+  .fc-icon-btn:hover { background: #fef2f2; border-color: #fecaca; }
+
+  .fc-field { display: block; margin-top: 8px; }
+  .fc-field > span {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--fc-muted);
+  }
+  .fc-field textarea {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 11px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--fc-text);
+    background: #fff;
+    border: 1px solid var(--fc-border);
+    border-radius: 9px;
+    resize: none;
+    overflow: hidden;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .fc-field textarea:focus {
+    outline: none;
+    border-color: var(--fc-primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, .15);
+  }
+  .fc-empty-manage {
+    margin: 0;
+    padding: 28px 16px;
+    text-align: center;
+    font-size: 14px;
+    color: var(--fc-muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="fc-widget" id="fcWidget">
+
+  <div class="fc-header">
+    <h2 class="fc-title">🗂️ Flashcards</h2>
+    <div class="fc-tabs">
+      <button class="fc-tab is-active" type="button" data-view="study">Estudar</button>
+      <button class="fc-tab" type="button" data-view="manage">Gerenciar</button>
+    </div>
+  </div>
+
+  <!-- ========== MODO ESTUDO ========== -->
+  <section id="fcStudyView">
+    <div id="fcStudyBody">
+
+      <div class="fc-toolbar">
+        <select class="fc-select" id="fcFilter">
+          <option value="all">Todos os cards</option>
+          <option value="none">Não avaliados</option>
+          <option value="facil">Fácil</option>
+          <option value="medio">Médio</option>
+          <option value="dificil">Difícil</option>
+        </select>
+        <span class="fc-counter" id="fcCounter">0 / 0</span>
+      </div>
+
+      <div class="fc-scene">
+        <div class="fc-card" id="fcCard">
+          <div class="fc-face fc-front">
+            <span class="fc-face-label">Frente</span>
+            <p class="fc-face-text" id="fcFrontText"></p>
+          </div>
+          <div class="fc-face fc-back">
+            <span class="fc-face-label">Verso</span>
+            <p class="fc-face-text" id="fcBackText"></p>
+          </div>
+        </div>
+      </div>
+
+      <p class="fc-hint">
+        Clique no card para virar · atalhos: <b>espaço</b>, <b>← →</b>, <b>1 2 3</b>
+      </p>
+
+      <div class="fc-nav">
+        <button class="fc-btn" type="button" id="fcPrev">← Anterior</button>
+        <button class="fc-btn" type="button" id="fcNext">Próximo →</button>
+      </div>
+
+      <div class="fc-rate">
+        <button type="button" data-level="dificil">Difícil</button>
+        <button type="button" data-level="medio">Médio</button>
+        <button type="button" data-level="facil">Fácil</button>
+      </div>
+    </div>
+
+    <div class="fc-empty" id="fcStudyEmpty" hidden>
+      <p id="fcEmptyText">Nenhum card ainda.</p>
+    </div>
+  </section>
+
+  <!-- ========== MODO GERENCIAR ========== -->
+  <section id="fcManageView" hidden>
+    <button class="fc-add" type="button" id="fcAddBtn">+ Novo card</button>
+    <div class="fc-list" id="fcList"></div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const STORAGE_KEY = 'fcWidget.cards.v1';
+  const LEVEL_LABEL = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' };
+  const LEVELS = ['facil', 'medio', 'dificil'];
+
+  /* ---------------- DOM ---------------- */
+  const widget     = document.getElementById('fcWidget');
+  const tabs       = Array.from(widget.querySelectorAll('.fc-tab'));
+  const studyView  = document.getElementById('fcStudyView');
+  const manageView = document.getElementById('fcManageView');
+  const studyBody  = document.getElementById('fcStudyBody');
+  const studyEmpty = document.getElementById('fcStudyEmpty');
+  const emptyText  = document.getElementById('fcEmptyText');
+  const cardEl     = document.getElementById('fcCard');
+  const frontText  = document.getElementById('fcFrontText');
+  const backText   = document.getElementById('fcBackText');
+  const counter    = document.getElementById('fcCounter');
+  const filterSel  = document.getElementById('fcFilter');
+  const list       = document.getElementById('fcList');
+  const addBtn     = document.getElementById('fcAddBtn');
+  const prevBtn    = document.getElementById('fcPrev');
+  const nextBtn    = document.getElementById('fcNext');
+  const rateBtns   = Array.from(widget.querySelectorAll('.fc-rate button'));
+
+  /* ---------------- Estado ---------------- */
+  let cards = loadCards();
+  let currentIndex = 0;
+  let flipped = false;
+
+  /* ---------------- Persistência ---------------- */
+  function uid() {
+    return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  function normalize(c) {
+    return {
+      id: c && c.id ? c.id : uid(),
+      front: c && typeof c.front === 'string' ? c.front : '',
+      back:  c && typeof c.back  === 'string' ? c.back  : '',
+      level: c && LEVELS.indexOf(c.level) !== -1 ? c.level : null
+    };
+  }
+
+  function defaultCards() {
+    return [
+      { id: uid(), front: 'O que é um flashcard?',
+        back: 'Um cartão com pergunta na frente e resposta no verso, usado para revisão ativa.', level: null },
+      { id: uid(), front: 'Qual é a capital do Brasil?',
+        back: 'Brasília', level: null }
+    ];
+  }
+
+  function loadCards() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.map(normalize);
+      }
+    } catch (err) {
+      console.warn('Não foi possível carregar os cards:', err);
+    }
+    return defaultCards();
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+    } catch (err) {
+      console.warn('Não foi possível salvar os cards:', err);
+    }
+  }
+
+  /* ---------------- Fila / filtro ---------------- */
+  function getQueue() {
+    const f = filterSel.value;
+    if (f === 'all') return cards;
+    if (f === 'none') return cards.filter(c => !c.level);
+    return cards.filter(c => c.level === f);
+  }
+
+  /* ---------------- Render: estudo ---------------- */
+  function renderStudy() {
+    const queue = getQueue();
+
+    if (!cards.length) {
+      studyBody.hidden = true;
+      studyEmpty.hidden = false;
+      emptyText.textContent = 'Nenhum card ainda. Abra "Gerenciar" e clique em "+ Novo card".';
+      counter.textContent = '0 / 0';
+      return;
+    }
+    if (!queue.length) {
+      studyBody.hidden = true;
+      studyEmpty.hidden = false;
+      emptyText.textContent = 'Nenhum card corresponde a esse filtro.';
+      counter.textContent = '0 / 0';
+      return;
+    }
+
+    studyBody.hidden = false;
+    studyEmpty.hidden = true;
+
+    if (currentIndex >= queue.length) currentIndex = 0;
+    if (currentIndex < 0) currentIndex = queue.length - 1;
+
+    const card = queue[currentIndex];
+    frontText.textContent = card.front.trim() || '(frente vazia)';
+    backText.textContent  = card.back.trim()  || '(verso vazio)';
+    counter.textContent   = (currentIndex + 1) + ' / ' + queue.length;
+    cardEl.classList.toggle('is-flipped', flipped);
+  }
+
+  /* ---------------- Render: gerenciar ---------------- */
+  function renderManage() {
+    list.innerHTML = '';
+
+    if (!cards.length) {
+      const p = document.createElement('p');
+      p.className = 'fc-empty-manage';
+      p.textContent = 'Nenhum card. Clique em "+ Novo card" para começar.';
+      list.appendChild(p);
+      return;
+    }
+
+    cards.forEach(function (card, i) {
+      const item = document.createElement('div');
+      item.className = 'fc-item';
+
+      // cabeçalho do item
+      const head = document.createElement('div');
+      head.className = 'fc-item-head';
+
+      const num = document.createElement('span');
+      num.className = 'fc-item-num';
+      num.textContent = String(i + 1);
+
+      const badge = document.createElement('span');
+      badge.className = 'fc-badge ' + (card.level ? 'is-' + card.level : 'is-none');
+      badge.textContent = card.level ? LEVEL_LABEL[card.level] : 'Não avaliado';
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'fc-icon-btn';
+      del.title = 'Excluir card';
+      del.setAttribute('aria-label', 'Excluir card');
+      del.textContent = '🗑';
+      del.addEventListener('click', function () { deleteCard(card.id); });
+
+      head.append(num, badge, del);
+
+      // campos editáveis
+      const frontField = makeField('Frente', 'Pergunta…', card.front, function (v) {
+        card.front = v; save();
+      });
+      const backField = makeField('Verso', 'Resposta…', card.back, function (v) {
+        card.back = v; save();
+      });
+
+      item.append(head, frontField, backField);
+      list.appendChild(item);
+    });
+  }
+
+  function makeField(label, placeholder, value, onChange) {
+    const wrap = document.createElement('label');
+    wrap.className = 'fc-field';
+
+    const span = document.createElement('span');
+    span.textContent = label;
+
+    const ta = document.createElement('textarea');
+    ta.rows = 2;
+    ta.placeholder = placeholder;
+    ta.value = value;
+
+    autoGrow(ta);
+    ta.addEventListener('input', function () {
+      onChange(ta.value);
+      autoGrow(ta);
+    });
+
+    wrap.append(span, ta);
+    return wrap;
+  }
+
+  function autoGrow(el) {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }
+
+  /* ---------------- Ações ---------------- */
+  function toggleFlip() {
+    if (!getQueue().length) return;
+    flipped = !flipped;
+    cardEl.classList.toggle('is-flipped', flipped);
+  }
+
+  function go(delta) {
+    const queue = getQueue();
+    if (!queue.length) return;
+    currentIndex = (currentIndex + delta + queue.length) % queue.length;
+    flipped = false;
+    renderStudy();
+  }
+
+  function rate(level) {
+    const queue = getQueue();
+    const card = queue[currentIndex];
+    if (!card) return;
+
+    card.level = level;
+    save();
+
+    const newQueue = getQueue();
+    const idx = newQueue.indexOf(card);
+
+    if (idx !== -1 && newQueue.length > 1) {
+      currentIndex = (idx + 1) % newQueue.length;   // card continua na fila → avança
+    } else {
+      currentIndex = Math.min(currentIndex, Math.max(newQueue.length - 1, 0));
+    }
+
+    flipped = false;
+    renderStudy();
+  }
+
+  function addCard() {
+    const card = { id: uid(), front: '', back: '', level: null };
+    cards.push(card);
+    save();
+    renderManage();
+
+    const last = list.lastElementChild;
+    if (last) {
+      const ta = last.querySelector('textarea');
+      if (ta) ta.focus();
+      last.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  function deleteCard(id) {
+    const card = cards.find(function (c) { return c.id === id; });
+    if (!card) return;
+    if (!confirm('Excluir este card?')) return;
+
+    cards = cards.filter(function (c) { return c.id !== id; });
+    save();
+    renderManage();
+    renderStudy();
+  }
+
+  function setView(name) {
+    tabs.forEach(function (t) {
+      t.classList.toggle('is-active', t.dataset.view === name);
+    });
+
+    const isStudy = name === 'study';
+    studyView.hidden = !isStudy;
+    manageView.hidden = isStudy;
+
+    if (isStudy) renderStudy();
+    else renderManage();
+  }
+
+  /* ---------------- Eventos ---------------- */
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () { setView(t.dataset.view); });
+  });
+
+  cardEl.addEventListener('click', toggleFlip);
+  prevBtn.addEventListener('click', function () { go(-1); });
+  nextBtn.addEventListener('click', function () { go(1); });
+
+  rateBtns.forEach(function (b) {
+    b.addEventListener('click', function () { rate(b.dataset.level); });
+  });
+
+  filterSel.addEventListener('change', function () {
+    currentIndex = 0;
+    flipped = false;
+    renderStudy();
+  });
+
+  addBtn.addEventListener('click', addCard);
+
+  document.addEventListener('keydown', function (e) {
+    if (studyView.hidden) return;
+
+    const el = e.target;
+    const tag = el && el.tagName ? el.tagName : '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' ||
+        tag === 'BUTTON' || (el && el.isContentEditable)) return;
+
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleFlip(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
+    else if (e.key === 'ArrowLeft')  { e.preventDefault(); go(-1); }
+    else if (e.key === '1') { rate('dificil'); }
+    else if (e.key === '2') { rate('medio'); }
+    else if (e.key === '3') { rate('facil'); }
+  });
+
+  /* ---------------- Inicialização ---------------- */
+  setView('study');
+})();
+</script>
+
+</body>
+</html>
